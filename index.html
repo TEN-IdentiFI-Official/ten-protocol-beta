@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="base:app_id" content="697156c388e3bac59cf3d28c" />
+    <title>TEN IdentiFI | Protocol</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text y=%22.9em%22 font-size=%2290%22 fill=%22%2300f2ff%22 font-family=%22Arial%22 font-weight=%22bold%22 text-shadow=%220 0 10px %2300f2ff%22>X</text></svg>">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000;
+            --card: rgba(15, 15, 15, 0.98);
+            --border: rgba(255, 255, 255, 0.3);
+            --border-dim: rgba(255, 255, 255, 0.15);
+            --cyan: #00f2ff;
+            --cyan-dim: #00a8b5;
+            --red: #ff3333;
+            --text-bright: #ffffff; 
+            --text-mid: #d1d1d1; 
+            --text-dim: #a0a0a0; 
+            --green: #00ff41;
+            --cyan-glow: rgba(0, 168, 181, 0.2);
+        }
+
+        * { box-sizing: border-box; outline: none; user-select: none; }
+        input, .slot-addr, #hash-display, .toast, .modal-text, #verify-result, .corner-node { user-select: text !important; }
+
+        body { background-color: var(--bg); color: var(--text-bright); font-family: 'Inter', sans-serif; margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+        #notification-container { position: fixed; top: 20px; right: 20px; z-index: 4000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: rgba(20, 20, 20, 0.98); border: 1px solid var(--cyan-dim); color: var(--cyan-dim); padding: 15px 25px; border-radius: 10px; font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; backdrop-filter: blur(10px); animation: slideIn 0.3s ease forwards; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        #modal-overlay, #manifesto-overlay, #verify-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); backdrop-filter: blur(12px); z-index: 2500; display: none; align-items: center; justify-content: center; }
+        .modal-box { background: var(--card); border: 1px solid var(--border); padding: 40px; border-radius: 24px; width: 380px; text-align: center; }
+        .modal-text { font-size: 12px; letter-spacing: 1px; color: var(--text-mid); margin-bottom: 25px; text-transform: uppercase; font-family: 'JetBrains Mono'; line-height: 1.7; }
+        .manifesto-title { color: var(--cyan-dim); font-weight: 700; font-size: 14px; margin-bottom: 20px; letter-spacing: 4px; text-transform: uppercase; }
+
+        #intro-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 1s ease-in-out; }
+        .intro-x { font-size: 40vh; font-weight: 900; color: rgba(255, 255, 255, 0.07); position: absolute; opacity: 0; pointer-events: none; }
+        .intro-text { font-size: 10px; letter-spacing: 8px; color: var(--cyan-dim); font-family: 'JetBrains Mono'; opacity: 0; text-transform: uppercase; z-index: 3001; }
+        .run-x { animation: xPulse 2.2s ease-in-out forwards; }
+        .run-text { animation: textFade 2.2s ease-in-out forwards; }
+        @keyframes xPulse { 0% { transform: scale(0.8); opacity: 0; } 50% { opacity: 0.18; } 100% { transform: scale(1.1); opacity: 0; } }
+        @keyframes textFade { 0% { opacity: 0; letter-spacing: 2px; } 30% { opacity: 1; } 80% { opacity: 1; letter-spacing: 12px; } 100% { opacity: 0; } }
+
+        .watermark-x { position: fixed; font-weight: 900; color: rgba(255, 255, 255, 0.04); z-index: 0; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 85vh; user-select: none; pointer-events: none; }
+        #glow { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: radial-gradient(circle 250px at var(--x, 50%) var(--y, 50%), rgba(0, 242, 255, 0.06), transparent 80%); pointer-events: none; z-index: 1; }
+
+        .branding { text-align: center; z-index: 5; transition: 0.8s cubic-bezier(0.4, 0, 0.2, 1); margin-top: -30px; }
+        .branding h1 { font-size: 2.2rem; letter-spacing: 14px; margin: 0; font-weight: 700; text-transform: uppercase; text-indent: 14px; }
+        .branding h1 span { color: var(--cyan); text-shadow: 0 0 15px rgba(0, 242, 255, 0.4); }
+        .branding .slogan { font-size: 9px; letter-spacing: 10px; color: var(--text-mid); margin-top: 15px; text-transform: uppercase; transition: 0.4s; cursor: default; display: inline-block; font-weight: 700; }
+        .branding .slogan:hover { color: var(--cyan); text-shadow: 0 0 10px var(--cyan-glow); letter-spacing: 11px; }
+        .branding.at-top { transform: scale(0.75) translateY(-5px); margin-bottom: 10px; }
+
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; width: 400px; max-height: 82vh; padding: 25px; display: none; flex-direction: column; backdrop-filter: blur(30px); z-index: 100; box-shadow: 0 40px 100px #000; }
+        .scroll-area { overflow-y: auto; scrollbar-width: none; flex-grow: 1; margin: 10px 0; padding-right: 5px; }
+        .scroll-area::-webkit-scrollbar { display: none; }
+
+        .section-label { font-size: 9px; color: var(--cyan-dim); letter-spacing: 3px; text-transform: uppercase; font-weight: 700; margin-bottom: 10px; display: block; text-align: center; }
+        .slot { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-dim); border-radius: 16px; padding: 18px; margin-bottom: 10px; }
+        .slot-addr { font-family: 'JetBrains Mono'; font-size: 14px; color: var(--text-bright); font-weight: 700; display: block; margin-bottom: 10px; word-break: break-all; }
+        #hash-display { font-family: 'JetBrains Mono'; font-size: 14px; font-weight: 700; color: #ffffff; letter-spacing: 1px; word-break: break-all; padding: 5px 0; }
+
+        .btn-confirm { background: transparent; color: var(--cyan-dim); border: 1px solid rgba(0, 168, 181, 0.5); width: 100%; padding: 16px; border-radius: 12px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; font-size: 11px; transition: 0.3s; }
+        .btn-confirm:hover { background: var(--cyan-dim); color: #000; border-color: var(--cyan-dim); box-shadow: 0 0 15px var(--cyan-glow); }
+
+        .btn-mini { background: none; border: 1px solid #555; color: var(--text-mid); font-size: 8px; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-weight: 700; text-transform: uppercase; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-mini:hover { color: var(--cyan); border-color: var(--cyan); transform: scale(1.05); text-shadow: 0 0 12px var(--cyan); box-shadow: 0 0 15px rgba(0, 242, 255, 0.2); }
+
+        .btn-mini-red { border-color: var(--red) !important; color: var(--red) !important; }
+        .btn-mini-red:hover { color: #ff5555 !important; border-color: #ff5555 !important; transform: scale(1.05); text-shadow: 0 0 12px var(--red); box-shadow: 0 0 15px rgba(255, 51, 51, 0.25); }
+
+        .btn-close-alt { border-color: #333 !important; color: #666 !important; }
+        .btn-close-alt:hover { border-color: #555 !important; color: #aaa !important; background: transparent !important; box-shadow: none !important; transform: none !important; text-shadow: none !important; }
+        
+        #terminate-trigger { color: var(--red); font-size: 9px; font-weight: 900; cursor: pointer; transition: 0.3s; display: inline-block; opacity: 0.6; }
+        #terminate-trigger:hover { opacity: 1; text-shadow: 0 0 12px var(--red); transform: scale(1.1); }
+
+        input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.25); padding: 14px; border-radius: 12px; color: var(--text-bright); font-family: 'JetBrains Mono'; margin-bottom: 12px; font-size: 11px; transition: 0.3s; }
+        input:focus { border-color: var(--cyan-dim); background: rgba(255,255,255,0.08); }
+        input::placeholder { color: #555; }
+
+        .time-selector { display: flex; gap: 5px; background: rgba(0,0,0,0.4); border: 1px solid #444; padding: 4px; border-radius: 10px; margin-bottom: 10px; }
+        .time-option { flex: 1; font-size: 8px; font-weight: 700; color: #666; padding: 8px 0; cursor: pointer; border-radius: 7px; transition: 0.3s; text-align: center; }
+        .time-option.active { background: var(--cyan-dim); color: #000; }
+
+        .corner-node { position: fixed; font-size: 9px; text-decoration: none; font-family: 'JetBrains Mono'; border-bottom: 1px solid rgba(0, 168, 181, 0.2); z-index: 1000; cursor: pointer; transition: all 0.3s ease; font-weight: 700; color: var(--cyan-dim); letter-spacing: 1px; padding-bottom: 2px; text-transform: uppercase; }
+        .corner-node:hover { color: var(--cyan); border-bottom: 1px solid var(--cyan); text-shadow: 0 0 10px var(--cyan-glow); letter-spacing: 2px; }
+
+        #node-protocol { top: 110px; left: 30px; } 
+        #node-verify { top: 110px; right: 30px; }  
+        #node-fuel { bottom: 30px; left: 30px; }
+        #node-feedback { bottom: 30px; right: 30px; }
+
+        .m-word { color: var(--cyan-dim); font-weight: 700; margin-right: 5px; }
+        #boot-status { font-family: 'JetBrains Mono'; font-size: 9px; color: var(--cyan-dim); letter-spacing: 2px; margin-top: 15px; text-transform: uppercase; height: 12px; opacity: 0; }
+    </style>
+</head>
+<body>
+
+    <div id="notification-container"></div>
+
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <div id="modal-content" class="modal-text" style="color:#fff;"></div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-confirm btn-close-alt" onclick="closeModal('modal-overlay')">Cancel</button>
+                <button class="btn-confirm" id="modal-ok">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="verify-overlay" onclick="closeModal('verify-overlay')">
+        <div class="modal-box" style="width: 440px;" onclick="event.stopPropagation()">
+            <div class="manifesto-title">Verify Authority</div>
+            <p class="modal-text">Paste the Protocol Proof payload:</p>
+            <input type="text" id="input-proof" placeholder="BASE64_PAYLOAD..." style="margin-bottom: 20px;">
+            <div id="verify-result" style="margin-bottom: 20px;"></div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-confirm btn-close-alt" onclick="closeModal('verify-overlay')">Close</button>
+                <button class="btn-confirm" onclick="processExternalProof()">Validate</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="manifesto-overlay" onclick="closeModal('manifesto-overlay')">
+        <div class="modal-box manifesto-box" style="width:480px; text-align:left;" onclick="event.stopPropagation()">
+            <div class="manifesto-title">THE PROTOCOL</div>
+            <div class="modal-text" style="color: #eee; text-transform: none; font-family: 'JetBrains Mono'; font-size: 10px; line-height: 1.9;">
+                <p><span class="m-word">INITIALIZE:</span> Anchor your primary identity. This Master Node becomes the cryptographic root of your entire fleet.</p>
+                <p><span class="m-word">ORCHESTRATE:</span> Link multiple EVM clusters under a single authority. Manage fragmented assets with the precision of a unified entity.</p>
+                <p><span class="m-word">VALIDATE:</span> Generate signed proofs of ownership. Prove you are the architect of your fleet without ever exposing private keys.</p>
+                <p><span class="m-word">PURGE:</span> The Terminate command executes a complete memory wipe. Leave no digital footprint on the local machine.</p>
+                <p style="font-size: 8px; border-top: 1px solid #333; padding-top: 12px; color: #666; font-weight: 700;">SYSTEM: V1.0 DEFINITIVE - SHIELDED ENGINE</p>
+            </div>
+            <button class="btn-confirm btn-close-alt" onclick="closeModal('manifesto-overlay')" style="width:100%">[ CLOSE ]</button>
+        </div>
+    </div>
+
+    <div id="intro-overlay">
+        <div id="intro-x-el" class="intro-x">X</div>
+        <div id="intro-text-el" class="intro-text">TEN IDENTIFI PROTOCOL</div>
+    </div>
+
+    <div id="main-logo" class="branding">
+        <h1>TEN IDENTI<span>FI</span></h1>
+        <div id="slogan-text" class="slogan">X WALLETS - ONE IDENTITY</div>
+    </div>
+
+    <div class="watermark-x">X</div>
+    <div id="glow"></div>
+
+    <div id="view-login" style="z-index:150; margin-top:30px; text-align: center; width: 320px;">
+        <p style="font-size: 10px; color: var(--text-mid); letter-spacing: 2px; margin-bottom: 25px; text-transform: uppercase; font-weight: 700;">
+            ANONYMOUS AUTHORITY.<br>CRYPTOGRAPHIC PROOF.
+        </p>
+        <button id="btn-connect" class="btn-confirm" onclick="connect()">Connect Master</button>
+        <div id="boot-status">INITIALIZING...</div>
+    </div>
+
+    <div id="view-app" class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <span id="status-badge" style="font-size:9px; font-weight:900; letter-spacing:1px;">● ANCHOR_MODE</span>
+            <span id="terminate-trigger" onclick="triggerExit()">[ TERMINATE ]</span>
+        </div>
+
+        <div class="scroll-area">
+            <span class="section-label">Master Anchor</span>
+            <div class="slot" style="text-align: center;">
+                <span class="slot-addr" id="master-addr-display">0x...</span>
+                <div style="display:flex; gap:10px; justify-content:center;">
+                    <button class="btn-mini" id="btn-copy-master">Copy</button>
+                    <button class="btn-mini btn-mini-red" onclick="switchAnchor()">Switch Anchor</button>
+                </div>
+            </div>
+
+            <span class="section-label">Protocol Proof</span>
+            <div class="slot" style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                <span id="hash-display">AWAITING PROOF</span>
+                <div id="proof-controls" style="width: 100%; display: none;">
+                    <div class="time-selector">
+                        <div class="time-option" onclick="setTime(1, this)">24H</div>
+                        <div class="time-option active" onclick="setTime(30, this)">30D</div>
+                        <div class="time-option" onclick="setTime(60, this)">60D</div>
+                        <div class="time-option" onclick="setTime(0, this)">PERP</div>
+                    </div>
+                </div>
+                <div id="hash-action"></div>
+            </div>
+
+            <span class="section-label">Fleet Clusters</span>
+            <div id="grid"></div>
+        </div>
+
+        <input type="text" id="target-addr" placeholder="0x... EVM Target Address">
+        <button class="btn-confirm" onclick="saveNewCluster()" style="padding:14px; font-size:10px;">Link Cluster</button>
+    </div>
+
+    <a id="node-protocol" class="corner-node" onclick="openManifesto()">Protocol</a>
+    <a id="node-verify" class="corner-node" onclick="openVerify()">Validate Proof</a>
+    <a id="node-fuel" class="corner-node" onclick="revealFuel(this)">Fuel the Protocol</a>
+    <a id="node-feedback" class="corner-node" onclick="handleFeedback(this)">Feedback</a>
+
+    <script>
+        const _0x1606b4=_0x1a33;(function(_0xc9f577,_0xe4f3bd){const _0x440d80=_0x1a33,_0x2a2e9c=_0xc9f577();while(!![]){try{const _0xc9b5cd=-parseInt(_0x440d80(0x199))/0x1+-parseInt(_0x440d80(0x21e))/0x2*(-parseInt(_0x440d80(0x1be))/0x3)+parseInt(_0x440d80(0x1e8))/0x4+-parseInt(_0x440d80(0x1a9))/0x5*(-parseInt(_0x440d80(0x1b6))/0x6)+parseInt(_0x440d80(0x17d))/0x7*(parseInt(_0x440d80(0x1a6))/0x8)+parseInt(_0x440d80(0x22c))/0x9*(parseInt(_0x440d80(0x1ef))/0xa)+-parseInt(_0x440d80(0x21c))/0xb;if(_0xc9b5cd===_0xe4f3bd)break;else _0x2a2e9c['push'](_0x2a2e9c['shift']());}catch(_0x3221a7){_0x2a2e9c['push'](_0x2a2e9c['shift']());}}}(_0x1487,0x38e11));const _0x5a27c0=(function(){let _0xf34db7=!![];return function(_0x308f30,_0x44f884){const _0x535725=_0xf34db7?function(){const _0x879b1=_0x1a33;if(_0x44f884){const _0xe676dd=_0x44f884[_0x879b1(0x219)](_0x308f30,arguments);return _0x44f884=null,_0xe676dd;}}:function(){};return _0xf34db7=![],_0x535725;};}()),_0x1b1905=_0x5a27c0(this,function(){const _0x18e7d1=_0x1a33;return _0x1b1905[_0x18e7d1(0x1a4)]()['search'](_0x18e7d1(0x1f5))[_0x18e7d1(0x1a4)]()['constructor'](_0x1b1905)[_0x18e7d1(0x177)](_0x18e7d1(0x1f5));});_0x1b1905();let _p,_s,_a,_sd=0x1e;function _0x1487(){const _0xc5a6f7=['\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<button\x20class=\x22btn-mini\x20btn-mini-red\x22\x20onclick=\x22del(','view-app','(((.+)+)+)+$','removeItem','#777','--y','VERIFY_NODE_HARDENED:','NODE_SECURED','init_played','SHIELDED_ANCHOR_LOCKED','TEN_AUTH_V1:','set','style','opacity','innerText','className','exp','Feedback','getSigner','div','input-proof','</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22display:flex;\x20gap:8px;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20','substring','filter','parse','toLowerCase','time','mailto:','var(--cyan)','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22color:','map','ERROR','onclick','eth_requestAccounts','color','master','keydown','mousemove','apply','MASTER:\x20','</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<button\x20class=\x22btn-mini\x22\x20onclick=\x22copy(\x27','8802365ZvYlEZ',';\x20font-weight:700;\x22>EXPIRES:\x20','12238UdPBON','createElement','onload','utils','</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22color:','</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22margin-top:10px;\x20max-height:120px;\x20overflow-y:auto;\x20padding-right:5px;\x22>','verified','querySelectorAll','var(--text-dim)','PENDING','reload','accountsChanged','clientY','<button\x20class=\x22btn-mini\x22\x20style=\x22border-color:','1138212IdDeHi','fleet','toLocaleDateString','#f39c12','verify-overlay','search','\x20DAYS','COMMUNICATION_CHANNEL_OPEN','proof-controls','getElementById','\x27,\x20this)\x22>Copy</button>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20style=\x22color:var(--cyan-dim);\x20font-weight:700;\x22>MASTER</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>','747019mBFHOt','CANNOT_ADD_MASTER_AS_CLUSTER','var(--red)',')\x22>Verify</button>','appendChild','tenidentifi@proton.me','</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22display:flex;\x20gap:10px;\x20align-items:center;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<button\x20class=\x22btn-mini\x22\x20style=\x22font-size:7px;\x20padding:2px\x206px;\x22\x20onclick=\x22copy(\x27','href','AUTH_MASTER_ANCHOR_HARDENED','var(--cyan-dim)','target-addr','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20class=\x22slot\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22display:flex;\x20justify-content:space-between;\x20align-items:center;\x20margin-bottom:12px;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20class=\x22slot-addr\x22\x20style=\x22font-size:12px;\x20margin-bottom:0;\x22>','request','none','toast','classList','modal-ok',';\x20font-weight:700;\x20font-size:11px;\x20margin-bottom:10px;\x22>','<button\x20class=\x22btn-mini\x22\x20style=\x22border-color:var(--cyan-dim);\x20color:var(--cyan-dim);\x22\x20onclick=\x22generateProtocolProof()\x22>Generate\x20Proof</button>','#444','intro-overlay','>\x20AWAITING_SHIELDED_SIGNATURE...','master-addr-display','now','✗\x20PROOF\x20EXPIRED','?subject=TEN_PROTOCOL_SIGNAL','NODE_ALREADY_EXISTS','ethereum','174290AriKch','length','last_proof','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22font-family:\x27JetBrains\x20Mono\x27;\x20font-size:9px;\x20color:var(--text-mid);\x20padding:8px\x200;\x20border-bottom:1px\x20solid\x20#222;\x20display:flex;\x20justify-content:space-between;\x20align-items:center;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span>','NODE_REMOVED','sort','TRANSMITTING_SIGNAL...','`,\x20this)\x22>Copy\x20All\x20Fleet</button>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22color:var(--text-mid)\x22>ISSUED:\x20','NODE_LINKED','manifesto-overlay','●\x20NODE_MODE','toString','sig','8GrNPrP','addr','PROTOCOL_FUELED','1498355ISXHMm','clear','slice','join','addEventListener','signMessage','target','</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>','NO\x20PROOF\x20GENERATED','#ffffff','boot-status','run-x','at-top','6UgXNOT','run-text','SIGN_FAILED','SECURED','DONE','setItem','\x22\x20onclick=\x22forceVerify(','setProperty','12UmLdop','get','clipboard','PROOF_GENERATED','forEach','--x','glow','var(--green)','0x33b9B6498b1319B737efC4f5956Cb4611DAbb974','SWITCH_ACCOUNT_IN_WALLET','stringify','_tk_','location','✓\x20IDENTITY\x20CONFIRMED','active','COPIED','main-logo','key','push','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20','●\x20ANCHOR_MODE','\x20WALLETS\x20-\x20ONE\x20IDENTITY','<div\x20style=\x22color:var(--red);\x22>✗\x20INVALID\x20SIGNATURE</div>','\x0aFLEET:\x0a','<button\x20class=\x22btn-mini\x22\x20style=\x22border-color:var(--cyan-dim);\x20color:var(--cyan-dim);\x22\x20onclick=\x22showProofGenerator()\x22>Update\x20Proof</button>','some','trim','btn-copy-master','notification-container','<div\x20style=\x27color:#666;\x20text-align:center;\x20padding:20px;\x20font-size:10px;\x20font-weight:700;\x27>NO\x20CLUSTERS\x20FOUND</div>','display','\x27,\x20this)\x22>Copy</button>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22display:flex;\x20justify-content:space-between;\x20align-items:center;\x20border-top:\x201px\x20solid\x20rgba(255,255,255,0.05);\x20padding-top:10px;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20style=\x22font-size:9px;\x20font-weight:900;\x20color:','add','VERIFY_NODES_FIRST','innerHTML','value','view-login','getItem','verify-result','hash-display','INVALID_ADDRESS','slogan-text','1588856YRBbcw','writeText','replace','flex','grid','.time-option',')\x22>DEL</button>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>','30FqKpLN','clientX','verifyMessage','remove'];_0x1487=function(){return _0xc5a6f7;};return _0x1487();}const SUPPORT_ADDR=_0x1606b4(0x1c6),PROJECT_EMAIL=_0x1606b4(0x182);let fuelRevealed=![],feedbackRevealed=![];const _S={'set':(_0x48b1b4,_0x4452a7)=>{const _0x16dfbf=_0x1606b4,_0x57a2a1=_a?_a[_0x16dfbf(0x1ab)](-0x4):'X';sessionStorage[_0x16dfbf(0x1bb)](_0x16dfbf(0x1c9)+_0x48b1b4,btoa(_0x57a2a1+JSON[_0x16dfbf(0x1c8)](_0x4452a7)+_0x57a2a1));},'get':_0x12341b=>{const _0x527cb5=_0x1606b4;try{const _0x473458=sessionStorage[_0x527cb5(0x1e3)](_0x527cb5(0x1c9)+_0x12341b);if(!_0x473458)return null;const _0x268107=_a?_a[_0x527cb5(0x1ab)](-0x4):'X',_0x27bd4b=atob(_0x473458),_0x4d4aca=_0x27bd4b[_0x527cb5(0x209)](_0x268107[_0x527cb5(0x19a)],_0x27bd4b[_0x527cb5(0x19a)]-_0x268107[_0x527cb5(0x19a)]);return JSON[_0x527cb5(0x20b)](_0x4d4aca);}catch(_0x2eb540){return null;}},'clear':()=>sessionStorage[_0x1606b4(0x1aa)]()};function setTime(_0x3aa214,_0x205bc3){const _0x1131c3=_0x1606b4;_sd=_0x3aa214,document[_0x1131c3(0x225)](_0x1131c3(0x1ed))[_0x1131c3(0x1c2)](_0x426ae2=>_0x426ae2[_0x1131c3(0x18c)][_0x1131c3(0x1f2)](_0x1131c3(0x1cc))),_0x205bc3[_0x1131c3(0x18c)][_0x1131c3(0x1de)]('active'),notify('VALIDITY:\x20'+(_0x3aa214===0x0?'PERPETUAL':_0x3aa214+_0x1131c3(0x178)));}function notify(_0x444dfb){const _0x3d4c65=_0x1606b4,_0x52249e=document[_0x3d4c65(0x17b)](_0x3d4c65(0x1da)),_0x53f58b=document[_0x3d4c65(0x21f)](_0x3d4c65(0x206));_0x53f58b[_0x3d4c65(0x202)]=_0x3d4c65(0x18b),_0x53f58b['innerText']=_0x444dfb,_0x52249e[_0x3d4c65(0x181)](_0x53f58b),setTimeout(()=>{const _0x1e2bae=_0x3d4c65;_0x53f58b[_0x1e2bae(0x1ff)]['opacity']='0',setTimeout(()=>_0x53f58b[_0x1e2bae(0x1f2)](),0x1f4);},0xbb8);}function revealFuel(_0x239f44){const _0x41dd9a=_0x1606b4;!fuelRevealed?(_0x239f44[_0x41dd9a(0x201)]=short(SUPPORT_ADDR,0x8),notify('TREASURY_REVEALED'),fuelRevealed=!![]):(navigator[_0x41dd9a(0x1c0)][_0x41dd9a(0x1e9)](SUPPORT_ADDR),_0x239f44[_0x41dd9a(0x201)]=_0x41dd9a(0x1cd),notify(_0x41dd9a(0x1a8)),setTimeout(()=>{_0x239f44['innerText']='Fuel\x20the\x20Protocol',fuelRevealed=![];},0x7d0));}function handleFeedback(_0x4bc8fe){const _0x5edc2a=_0x1606b4;!feedbackRevealed?(_0x4bc8fe[_0x5edc2a(0x201)]=PROJECT_EMAIL,_0x4bc8fe[_0x5edc2a(0x1ff)][_0x5edc2a(0x215)]=_0x5edc2a(0x20f),notify(_0x5edc2a(0x179)),feedbackRevealed=!![]):(window[_0x5edc2a(0x1ca)][_0x5edc2a(0x184)]=_0x5edc2a(0x20e)+PROJECT_EMAIL+_0x5edc2a(0x196),notify(_0x5edc2a(0x19f)),setTimeout(()=>{const _0x585d22=_0x5edc2a;_0x4bc8fe[_0x585d22(0x201)]=_0x585d22(0x204),_0x4bc8fe[_0x585d22(0x1ff)][_0x585d22(0x215)]=_0x585d22(0x186),feedbackRevealed=![];},0xbb8));}function ask(_0x4ab572,_0x3692aa){const _0x2a23bd=_0x1606b4,_0x428e68=document['getElementById']('modal-overlay');document[_0x2a23bd(0x17b)]('modal-content')[_0x2a23bd(0x201)]=_0x4ab572,_0x428e68[_0x2a23bd(0x1ff)][_0x2a23bd(0x1dc)]=_0x2a23bd(0x1eb),document[_0x2a23bd(0x17b)](_0x2a23bd(0x18d))[_0x2a23bd(0x213)]=()=>{const _0x325e64=_0x2a23bd;_0x428e68[_0x325e64(0x1ff)]['display']='none',_0x3692aa();};}function closeModal(_0x1ae4ad){const _0x32d8e2=_0x1606b4;document[_0x32d8e2(0x17b)](_0x1ae4ad)['style'][_0x32d8e2(0x1dc)]=_0x32d8e2(0x18a);}function openManifesto(){const _0x31d599=_0x1606b4;document['getElementById'](_0x31d599(0x1a2))['style'][_0x31d599(0x1dc)]=_0x31d599(0x1eb);}function openVerify(){const _0x4ff436=_0x1606b4;document['getElementById'](_0x4ff436(0x230))[_0x4ff436(0x1ff)]['display']='flex',document[_0x4ff436(0x17b)](_0x4ff436(0x1e4))[_0x4ff436(0x1e0)]='',document[_0x4ff436(0x17b)]('input-proof')[_0x4ff436(0x1e1)]='';}function short(_0x247042,_0x499a4f=0x6){const _0x6ba599=_0x1606b4;return _0x247042?_0x247042[_0x6ba599(0x209)](0x0,_0x499a4f)+'...'+_0x247042['substring'](_0x247042[_0x6ba599(0x19a)]-0x4):'0x...';}async function connect(){const _0x5b297a=_0x1606b4;if(!window['ethereum'])return;const _0x213363=document['getElementById'](_0x5b297a(0x1b3));try{const _0x4cd5ec=await window[_0x5b297a(0x198)][_0x5b297a(0x189)]({'method':_0x5b297a(0x214)});_a=_0x4cd5ec[0x0][_0x5b297a(0x20c)](),_p=new ethers['providers']['Web3Provider'](window[_0x5b297a(0x198)]),_s=_p[_0x5b297a(0x205)]();let _0x36e4ce=_S[_0x5b297a(0x1bf)]('ma');!_0x36e4ce&&(_0x213363['style']['opacity']='1',_0x213363[_0x5b297a(0x201)]=_0x5b297a(0x192),await _s[_0x5b297a(0x1ae)](_0x5b297a(0x185)),_S[_0x5b297a(0x1fe)]('ma',_a),notify(_0x5b297a(0x1fc))),document[_0x5b297a(0x17b)](_0x5b297a(0x1e2))['style'][_0x5b297a(0x1dc)]=_0x5b297a(0x18a),document[_0x5b297a(0x17b)](_0x5b297a(0x1ce))['classList']['add'](_0x5b297a(0x1b5)),document[_0x5b297a(0x17b)](_0x5b297a(0x1f4))[_0x5b297a(0x1ff)][_0x5b297a(0x1dc)]='flex',window[_0x5b297a(0x198)]['on'](_0x5b297a(0x229),_0x394ad0=>{const _0x4cd99f=_0x5b297a;_0x394ad0[0x0]&&(_a=_0x394ad0[0x0][_0x4cd99f(0x20c)](),render());}),render();}catch(_0x463cb8){notify('CONNECTION_FAILED'),_0x213363[_0x5b297a(0x1ff)][_0x5b297a(0x200)]='0';}}function render(){const _0x1d4f0e=_0x1606b4,_0x3a3f0e=_S['get']('ma'),_0x3c48d4=_S[_0x1d4f0e(0x1bf)]('cl')||[],_0xc8fd31=localStorage[_0x1d4f0e(0x1e3)]('last_proof'),_0x4d1157=_a===_0x3a3f0e;document[_0x1d4f0e(0x17b)](_0x1d4f0e(0x193))[_0x1d4f0e(0x201)]=short(_0x3a3f0e,0xa),document['getElementById'](_0x1d4f0e(0x1d9))[_0x1d4f0e(0x213)]=_0x847a05=>copy(_0x3a3f0e,_0x847a05[_0x1d4f0e(0x1af)]);const _0x54b773=document[_0x1d4f0e(0x17b)]('status-badge');_0x54b773[_0x1d4f0e(0x201)]=_0x4d1157?_0x1d4f0e(0x1d2):_0x1d4f0e(0x1a3),_0x54b773[_0x1d4f0e(0x1ff)][_0x1d4f0e(0x215)]=_0x4d1157?_0x1d4f0e(0x186):_0x1d4f0e(0x17f),document[_0x1d4f0e(0x17b)](_0x1d4f0e(0x1e7))[_0x1d4f0e(0x201)]=_0x3c48d4[_0x1d4f0e(0x19a)]+_0x1d4f0e(0x1d3);const _0x22cbb1=document[_0x1d4f0e(0x17b)](_0x1d4f0e(0x1e5)),_0x366ed0=document['getElementById']('hash-action'),_0x422708=document[_0x1d4f0e(0x17b)](_0x1d4f0e(0x17a));if(_0xc8fd31){_0x422708['style'][_0x1d4f0e(0x1dc)]=_0x1d4f0e(0x18a);try{const _0x1f7f71=JSON[_0x1d4f0e(0x20b)](atob(_0xc8fd31));_0x22cbb1[_0x1d4f0e(0x201)]=short(_0x1f7f71[_0x1d4f0e(0x1a5)],0xc),_0x22cbb1[_0x1d4f0e(0x1ff)][_0x1d4f0e(0x215)]=_0x1d4f0e(0x1b2);}catch(_0x37452a){_0x22cbb1[_0x1d4f0e(0x201)]=_0x1d4f0e(0x212);}_0x366ed0[_0x1d4f0e(0x1e0)]='\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22display:flex;\x20gap:8px;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<button\x20class=\x22btn-mini\x22\x20onclick=\x22copy(localStorage.getItem(\x27last_proof\x27),\x20this)\x22>Export\x20Proof</button>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20'+(_0x4d1157?_0x1d4f0e(0x1d6):'')+_0x1d4f0e(0x1d1);}else _0x22cbb1['innerText']=_0x1d4f0e(0x1b1),_0x22cbb1[_0x1d4f0e(0x1ff)][_0x1d4f0e(0x215)]=_0x1d4f0e(0x226),_0x4d1157?(_0x422708['style'][_0x1d4f0e(0x1dc)]='block',_0x366ed0[_0x1d4f0e(0x1e0)]=_0x1d4f0e(0x18f)):(_0x422708[_0x1d4f0e(0x1ff)][_0x1d4f0e(0x1dc)]=_0x1d4f0e(0x18a),_0x366ed0['innerHTML']='<span\x20style=\x22font-size:8px;\x20color:var(--red);\x20font-weight:700;\x20letter-spacing:1px;\x22>MASTER\x20AUTHORITY\x20ONLY</span>');const _0x4a598a=document['getElementById'](_0x1d4f0e(0x1ec));_0x4a598a[_0x1d4f0e(0x1e0)]=_0x3c48d4[_0x1d4f0e(0x19a)]?_0x3c48d4[_0x1d4f0e(0x211)]((_0x423603,_0x387bd4)=>{const _0x2a3b24=_0x1d4f0e,_0x594eb7=_a===_0x423603[_0x2a3b24(0x1a7)];return _0x2a3b24(0x188)+short(_0x423603[_0x2a3b24(0x1a7)])+_0x2a3b24(0x21b)+_0x423603['addr']+_0x2a3b24(0x1dd)+(_0x423603[_0x2a3b24(0x224)]?_0x2a3b24(0x1c5):_0x594eb7?_0x2a3b24(0x22f):_0x2a3b24(0x1f7))+'\x22>'+(_0x423603['verified']?_0x2a3b24(0x1b9):_0x594eb7?_0x2a3b24(0x227):'OFFLINE')+_0x2a3b24(0x208)+(!_0x423603[_0x2a3b24(0x224)]?_0x2a3b24(0x22b)+(_0x594eb7?'var(--cyan-dim)':_0x2a3b24(0x190))+_0x2a3b24(0x1bc)+_0x387bd4+_0x2a3b24(0x180):'')+_0x2a3b24(0x1f3)+_0x387bd4+_0x2a3b24(0x1ee);})[_0x1d4f0e(0x1ac)](''):_0x1d4f0e(0x1db);}function showProofGenerator(){const _0x2b6610=_0x1606b4;localStorage[_0x2b6610(0x1f6)](_0x2b6610(0x19b)),render();}async function switchAnchor(){ask('RELEASE\x20CURRENT\x20ANCHOR?',()=>{const _0x4a27a9=_0x1a33;_S[_0x4a27a9(0x1aa)](),localStorage[_0x4a27a9(0x1f6)](_0x4a27a9(0x19b)),location[_0x4a27a9(0x228)]();});}async function generateProtocolProof(){const _0x5a9027=_0x1606b4,_0x3e9a5d=_S['get']('ma'),_0x3005ca=_S[_0x5a9027(0x1bf)]('cl')||[],_0x531670=_0x3005ca[_0x5a9027(0x20a)](_0xf6508c=>_0xf6508c[_0x5a9027(0x224)])[_0x5a9027(0x211)](_0x9c42b5=>_0x9c42b5[_0x5a9027(0x1a7)])[_0x5a9027(0x19e)]();if(_0x531670[_0x5a9027(0x19a)]===0x0){notify(_0x5a9027(0x1df));return;}try{const _0x37ce01=Date[_0x5a9027(0x194)](),_0x52c4b9=_sd===0x0?0x0:_0x37ce01+_sd*0x18*0x3c*0x3c*0x3e8,_0x3f1374=_0x5a9027(0x1fd)+_0x3e9a5d+':'+_0x531670[_0x5a9027(0x1ac)](',')+':'+_0x37ce01+':'+_0x52c4b9,_0xc51ffd=await _s['signMessage'](_0x3f1374),_0x1e5f12={'master':_0x3e9a5d,'fleet':_0x531670,'time':_0x37ce01,'exp':_0x52c4b9,'sig':_0xc51ffd};localStorage[_0x5a9027(0x1bb)](_0x5a9027(0x19b),btoa(JSON[_0x5a9027(0x1c8)](_0x1e5f12))),notify(_0x5a9027(0x1c1)),render();}catch(_0x5c7b12){notify(_0x5a9027(0x1b8));}}async function processExternalProof(){const _0x15dec9=_0x1606b4,_0x40a2f7=document['getElementById'](_0x15dec9(0x207))['value'][_0x15dec9(0x1d8)](),_0x4bfb69=document[_0x15dec9(0x17b)]('verify-result');if(!_0x40a2f7)return;try{const _0x1f2be8=JSON[_0x15dec9(0x20b)](atob(_0x40a2f7)),_0x345715=_0x15dec9(0x1fd)+_0x1f2be8[_0x15dec9(0x216)]+':'+_0x1f2be8[_0x15dec9(0x22d)][_0x15dec9(0x1ac)](',')+':'+_0x1f2be8[_0x15dec9(0x20d)]+':'+_0x1f2be8[_0x15dec9(0x203)],_0x58b169=ethers[_0x15dec9(0x221)][_0x15dec9(0x1f1)](_0x345715,_0x1f2be8[_0x15dec9(0x1a5)]);if(_0x58b169[_0x15dec9(0x20c)]()===_0x1f2be8[_0x15dec9(0x216)]['toLowerCase']()){const _0x83952a=Date[_0x15dec9(0x194)](),_0x44a4df=_0x1f2be8[_0x15dec9(0x203)]!==0x0&&_0x83952a>_0x1f2be8[_0x15dec9(0x203)],_0x49956d=new Date(_0x1f2be8['time'])['toLocaleDateString'](),_0x478e29=_0x1f2be8['exp']===0x0?'PERPETUAL':new Date(_0x1f2be8[_0x15dec9(0x203)])[_0x15dec9(0x22e)](),_0x48b764=_0x15dec9(0x21a)+_0x1f2be8[_0x15dec9(0x216)]+_0x15dec9(0x1d5)+_0x1f2be8[_0x15dec9(0x22d)][_0x15dec9(0x1ac)]('\x0a');let _0x474fd2=_0x15dec9(0x19c)+short(_0x1f2be8[_0x15dec9(0x216)],0xc)+_0x15dec9(0x183)+_0x1f2be8['master']+_0x15dec9(0x17c);_0x474fd2+=_0x1f2be8[_0x15dec9(0x22d)][_0x15dec9(0x211)](_0x5e8629=>_0x15dec9(0x19c)+short(_0x5e8629,0xc)+_0x15dec9(0x183)+_0x5e8629+'\x27,\x20this)\x22>Copy</button>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20style=\x22font-size:8px;\x20color:var(--text-dim);\x22>CLUSTER</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>')[_0x15dec9(0x1ac)](''),_0x4bfb69[_0x15dec9(0x1e0)]=_0x15dec9(0x210)+(_0x44a4df?_0x15dec9(0x17f):_0x15dec9(0x1c5))+_0x15dec9(0x18e)+(_0x44a4df?_0x15dec9(0x195):_0x15dec9(0x1cb))+'</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22background:rgba(0,0,0,0.4);\x20border:1px\x20solid\x20#222;\x20border-radius:12px;\x20padding:15px;\x20text-align:left;\x20font-family:\x27JetBrains\x20Mono\x27;\x20font-size:9px;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20style=\x22display:flex;\x20justify-content:space-between;\x20align-items:center;\x20margin-bottom:10px;\x20border-bottom:1px\x20solid\x20#222;\x20padding-bottom:8px;\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20style=\x22color:var(--text-bright);\x20font-weight:700;\x22>AUDIT\x20REPORT</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<button\x20class=\x22btn-mini\x22\x20style=\x22font-size:7px;\x20color:var(--cyan-dim);\x20border-color:var(--cyan-dim);\x22\x20onclick=\x22copy(`'+_0x48b764+_0x15dec9(0x1a0)+_0x49956d+_0x15dec9(0x222)+(_0x44a4df?_0x15dec9(0x17f):_0x15dec9(0x186))+_0x15dec9(0x21d)+_0x478e29+_0x15dec9(0x223)+_0x474fd2+_0x15dec9(0x1b0);}else _0x4bfb69[_0x15dec9(0x1e0)]=_0x15dec9(0x1d4);}catch(_0x52ae10){_0x4bfb69['innerHTML']='<div\x20style=\x22color:var(--red);\x22>✗\x20DATA\x20CORRUPTED</div>';}}async function forceVerify(_0x40d35d){const _0x2a6e55=_0x1606b4;let _0x7ecc33=_S[_0x2a6e55(0x1bf)]('cl')||[];if(_a!==_0x7ecc33[_0x40d35d][_0x2a6e55(0x1a7)])notify(_0x2a6e55(0x1c7));else try{await _s[_0x2a6e55(0x1ae)](_0x2a6e55(0x1f9)+_a),_0x7ecc33[_0x40d35d][_0x2a6e55(0x224)]=!![],_S[_0x2a6e55(0x1fe)]('cl',_0x7ecc33),notify(_0x2a6e55(0x1fa)),render();}catch(_0x195bf8){}}function saveNewCluster(){const _0x449f7b=_0x1606b4,_0x3bc27c=document[_0x449f7b(0x17b)](_0x449f7b(0x187))['value'][_0x449f7b(0x1d8)]()['toLowerCase'](),_0x73d1e2=_S[_0x449f7b(0x1bf)]('ma');if(ethers[_0x449f7b(0x221)]['isAddress'](_0x3bc27c)){if(_0x3bc27c===_0x73d1e2){notify(_0x449f7b(0x17e));return;}let _0xcd60be=_S[_0x449f7b(0x1bf)]('cl')||[];if(_0xcd60be[_0x449f7b(0x1d7)](_0x322409=>_0x322409[_0x449f7b(0x1a7)]===_0x3bc27c)){notify(_0x449f7b(0x197));return;}_0xcd60be[_0x449f7b(0x1d0)]({'addr':_0x3bc27c,'verified':![]}),_S['set']('cl',_0xcd60be),document['getElementById'](_0x449f7b(0x187))[_0x449f7b(0x1e1)]='',notify(_0x449f7b(0x1a1)),render();}else notify(_0x449f7b(0x1e6));}function del(_0x5b60e0){ask('UNLINK\x20CLUSTER?',()=>{const _0x3e174a=_0x1a33;let _0xa5e33d=_S[_0x3e174a(0x1bf)]('cl')||[];_0xa5e33d['splice'](_0x5b60e0,0x1),_S[_0x3e174a(0x1fe)]('cl',_0xa5e33d),notify(_0x3e174a(0x19d)),render();});}function copy(_0x40ab9c,_0x1ab291){const _0x12ef3a=_0x1606b4;navigator[_0x12ef3a(0x1c0)][_0x12ef3a(0x1e9)](_0x40ab9c);const _0x290242=_0x1ab291[_0x12ef3a(0x201)];_0x1ab291[_0x12ef3a(0x201)]=_0x12ef3a(0x1ba),notify(_0x12ef3a(0x1cd)),setTimeout(()=>_0x1ab291['innerText']=_0x290242,0x3e8);}function triggerExit(){const _0x4ce0c5=_0x1606b4;_S[_0x4ce0c5(0x1aa)](),localStorage['clear'](),sessionStorage[_0x4ce0c5(0x1aa)](),window['location'][_0x4ce0c5(0x1ea)](window[_0x4ce0c5(0x1ca)]['href']);}function _0x1a33(_0x5a96d8,_0x50a56a){_0x5a96d8=_0x5a96d8-0x177;const _0x126bee=_0x1487();let _0x1b1905=_0x126bee[_0x5a96d8];return _0x1b1905;}setInterval(()=>{const _0x2b932b=_0x1606b4,_0xd38a47=/./;_0xd38a47[_0x2b932b(0x1a4)]=function(){triggerExit();};},0x3e8),window['addEventListener'](_0x1606b4(0x217),_0x263d42=>{const _0x3c1a12=_0x1606b4;if(_0x263d42[_0x3c1a12(0x1cf)]==='Escape')triggerExit();}),window[_0x1606b4(0x1ad)](_0x1606b4(0x218),_0x1a86fa=>{const _0x34894d=_0x1606b4;document[_0x34894d(0x17b)](_0x34894d(0x1c4))[_0x34894d(0x1ff)][_0x34894d(0x1bd)](_0x34894d(0x1c3),_0x1a86fa[_0x34894d(0x1f0)]+'px'),document[_0x34894d(0x17b)](_0x34894d(0x1c4))[_0x34894d(0x1ff)][_0x34894d(0x1bd)](_0x34894d(0x1f8),_0x1a86fa[_0x34894d(0x22a)]+'px');}),window[_0x1606b4(0x220)]=()=>{const _0x40bbe4=_0x1606b4;!sessionStorage[_0x40bbe4(0x1e3)](_0x40bbe4(0x1fb))?(document[_0x40bbe4(0x17b)]('intro-x-el')['classList'][_0x40bbe4(0x1de)](_0x40bbe4(0x1b4)),document[_0x40bbe4(0x17b)]('intro-text-el')[_0x40bbe4(0x18c)][_0x40bbe4(0x1de)](_0x40bbe4(0x1b7)),setTimeout(()=>{const _0x1835f1=_0x40bbe4;document[_0x1835f1(0x17b)](_0x1835f1(0x191))[_0x1835f1(0x1ff)][_0x1835f1(0x1dc)]=_0x1835f1(0x18a),sessionStorage[_0x1835f1(0x1bb)]('init_played','true');},0x898)):document[_0x40bbe4(0x17b)](_0x40bbe4(0x191))[_0x40bbe4(0x1ff)][_0x40bbe4(0x1dc)]=_0x40bbe4(0x18a);if(_S[_0x40bbe4(0x1bf)]('ma'))connect();};
+
+
+ 
+(function() {
+    
+    const authorized = ["localhost", "127.0.0.1", "ten-identifi-official.github.io"]; 
+    const currentHost = window.location.hostname;
+
+    if (!authorized.includes(currentHost)) {
+        
+        document.body.innerHTML = `
+            <div style="background:#000; color:#ff3333; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; text-align:center; padding:20px;">
+                <h1 style="letter-spacing:10px; margin:0;">DOMAIN_VIOLATION</h1>
+                <p style="color:#555; font-size:10px; max-width:400px; margin-top:20px;">THIS PROTOCOL IS RUNNING ON AN UNAUTHORIZED DOMAIN. FOR YOUR SAFETY, ALL FUNCTIONS HAVE BEEN DEACTIVATED.</p>
+                <div style="margin-top:30px; border:1px solid #ff3333; padding:10px; font-size:9px; color:#ff3333; opacity:0.6;">ORIGINAL_SOURCE: TEN_IDENTIFI_OFFICIAL</div>
+            </div>`;
+        throw new Error("UNAUTHORIZED_DOMAIN_ACCESS");
+    }
+})();
+
+ </script>
+</body>
+</html>
